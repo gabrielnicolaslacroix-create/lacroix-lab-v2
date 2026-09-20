@@ -38,7 +38,7 @@ export default function Home() {
 
   const totalReal = items.reduce((acc, it) => acc + (it.unit * (parseFloat(it.cant) || 1)), 0)
   const totalConDesc = totalReal - (totalReal * descuento / 100)
-  const calcHojas = () => { if (items.length <= 8) return 1; return 1 + Math.ceil((items.length - 8) / 14) }
+  const calcHojas = () => { if (items.length <= 10) return 1; return 1 + Math.ceil((items.length - 10) / 14) }
   const hojas = calcHojas()
   const getFinalRgb = (hex: string) => {
     let r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16)
@@ -74,44 +74,32 @@ export default function Home() {
       doc.setTextColor(80,80,80); doc.setFontSize(5); doc.text(`${empresa} • ${emailEmpresa} • ${telefono} • Verificar: ${nroPresu}`, 105, 270.5, {align:'center'})
     }
     let pageNum = 1; addPageFrame(); addHeader(pageNum); let y = 33
-    doc.setFillColor(255,255,255); doc.setDrawColor(220,225,232); doc.roundedRect(10, y, 116, 34, 3, 3, 'FD')
-    doc.setTextColor(140,145,155); doc.setFont('helvetica','bold'); doc.setFontSize(5); doc.text("PARA / CLIENTE:", 13, y+4.5)
-    doc.setDrawColor(235,238,242); doc.line(13, y+6, 122, y+6)
-    doc.setFont('helvetica','normal'); doc.setFontSize(4.8); doc.setTextColor(120,125,135); doc.text("CLIENTE", 13, y+8.5)
-    doc.setFont('helvetica','bold'); doc.setFontSize(5.8); doc.setTextColor(15,23,42); doc.text(cliente.substring(0,44), 13, y+11)
-    doc.setDrawColor(241,245,249); doc.line(13, y+12.5, 122, y+12.5)
-    doc.setFont('helvetica','normal'); doc.setFontSize(4.6); doc.setTextColor(120,125,135); doc.text("CUIT / CONTACTO", 13, y+15)
-    doc.setFont('helvetica','bold'); doc.setFontSize(5.2); doc.setTextColor(30,41,59); doc.text(`${clienteCuit} • ${clienteContacto.substring(0,32)}`, 13, y+17.5)
-    doc.setDrawColor(241,245,249); doc.line(13, y+19, 122, y+19)
-    doc.setFont('helvetica','normal'); doc.setFontSize(4.6); doc.setTextColor(120,125,135); doc.text("PROYECTO", 13, y+21.5)
-    doc.setFont('helvetica','bold'); doc.setFontSize(5.2); doc.setTextColor(30,41,59); doc.text(proyecto.substring(0,46), 13, y+24)
-    doc.setDrawColor(241,245,249); doc.line(13, y+25.5, 122, y+25.5)
-    doc.setFont('helvetica','normal'); doc.setFontSize(4.6); doc.setTextColor(120,125,135); doc.text("DIRECCIÓN", 13, y+28)
-    doc.setFont('helvetica','bold'); doc.setFontSize(5.2); doc.setTextColor(30,41,59); doc.text(direccion.substring(0,50), 13, y+30.5)
-    doc.setFillColor(255,255,255); doc.roundedRect(130, y, 70, 34, 3, 3, 'FD')
-    doc.setFont('helvetica','bold'); doc.setFontSize(5); doc.setTextColor(140,145,155); doc.text("DETALLES PRESUPUESTO:", 133, y+4.5)
-    doc.setDrawColor(235,238,242); doc.line(133, y+6, 196, y+6)
-    doc.setFontSize(5.2); doc.setTextColor(30,41,59); doc.text(`N°: ${nroPresu}`, 133, y+9.5)
-    doc.setDrawColor(241,245,249); doc.line(133, y+11, 196, y+11)
-    doc.text(`Fecha: 10/09/2026`, 133, y+14); doc.setDrawColor(241,245,249); doc.line(133, y+15.5, 196, y+15.5)
-    doc.text(`Validez: 15 días`, 133, y+18.5); doc.setDrawColor(241,245,249); doc.line(133, y+20, 196, y+20)
-    doc.text(`Pago: 50% / 50%`, 133, y+23)
-    doc.setFillColor(220,252,231); doc.setDrawColor(187,247,208); doc.roundedRect(133, y+25, 62, 4.5, 2, 2, 'FD')
-    doc.setFontSize(4.5); doc.setTextColor(22,101,52); doc.text("● VIGENTE - 10/09/2026", 136, y+28)
-    y += 38
-    doc.setFillColor(241,245,249); doc.setDrawColor(220,225,232); doc.roundedRect(10, y, 190, 8, 2, 2, 'FD')
-    doc.setTextColor(60,70,85); doc.setFont('helvetica','bold'); doc.setFontSize(6); doc.text("DETALLE DEL PROYECTO", 13, y+5)
-    doc.setFontSize(4.6); doc.setTextColor(100,110,125); doc.text(`${items.length} items • ${nroPresu}`, 170, y+5)
-    y += 10.5
-    doc.setFillColor(r,g,b); doc.roundedRect(10, y, 190, 8, 2, 2, 'F'); doc.setTextColor(255,255,255); doc.setFontSize(5.5); doc.setFont('helvetica','bold')
-    doc.text("DESCRIPCIÓN", 13, y+5); doc.text("CANTIDAD", 90, y+5, {align:'center'}); doc.text("PRECIO UNITARIO", 128, y+5, {align:'center'}); doc.text("SUBTOTAL", 176, y+5, {align:'center'}); y += 10
+
+    // --- BLOQUE COMPACTO NUEVO (ANTES 38px, AHORA 26px) ---
+    doc.setFillColor(255,255,255); doc.setDrawColor(220,225,232); doc.roundedRect(10, y, 190, 16, 3, 3, 'FD')
+    doc.setTextColor(140,145,155); doc.setFont('helvetica','bold'); doc.setFontSize(4.2);
+    doc.text("CLIENTE:", 13, y+4); doc.text("CUIT/CONTACTO:", 55, y+4); doc.text("PROYECTO / OBRA:", 105, y+4); doc.text("DETALLES:", 160, y+4)
+    doc.setDrawColor(235,238,242); doc.line(13, y+5.5, 187, y+5.5)
+    doc.setFont('helvetica','bold'); doc.setFontSize(5.4); doc.setTextColor(15,23,42); doc.text(cliente.substring(0,32), 13, y+9)
+    doc.setFont('helvetica','normal'); doc.setFontSize(4.6); doc.setTextColor(50,50,55); doc.text(`${clienteCuit} • ${clienteContacto.substring(0,28)}`, 55, y+9)
+    doc.text(`${proyecto.substring(0,38)}`, 105, y+9); doc.setTextColor(100,100,105); doc.setFontSize(4.4); doc.text(`${direccion.substring(0,32)}`, 105, y+12)
+    doc.setFont('helvetica','bold'); doc.setFontSize(4.8); doc.setTextColor(15,23,42); doc.text(`${nroPresu} • ${new Date().toLocaleDateString()}`, 160, y+9)
+    doc.setFillColor(220,252,231); doc.setDrawColor(187,247,208); doc.roundedRect(160, y+10.5, 24, 3.5, 2, 2, 'FD'); doc.setFontSize(3.8); doc.setTextColor(22,101,52); doc.text("● VIGENTE", 162, y+12.8)
+    y += 19
+
+    doc.setFillColor(241,245,249); doc.setDrawColor(220,225,232); doc.roundedRect(10, y, 190, 7, 2, 2, 'FD')
+    doc.setTextColor(60,70,85); doc.setFont('helvetica','bold'); doc.setFontSize(5.5); doc.text("DETALLE DEL PROYECTO", 13, y+4.5)
+    doc.setFontSize(4.3); doc.setTextColor(100,110,125); doc.text(`${items.length} items • ${nroPresu}`, 170, y+4.5)
+    y += 9.5
+    doc.setFillColor(r,g,b); doc.roundedRect(10, y, 190, 7, 2, 2, 'F'); doc.setTextColor(255,255,255); doc.setFontSize(5); doc.setFont('helvetica','bold')
+    doc.text("DESCRIPCIÓN", 13, y+4.5); doc.text("CANTIDAD", 90, y+4.5, {align:'center'}); doc.text("PRECIO UNITARIO", 128, y+4.5, {align:'center'}); doc.text("SUBTOTAL", 176, y+4.5, {align:'center'}); y += 9
     for (let i = 0; i < items.length; i++) {
-      if (y > 168) { pageNum++; doc.addPage('a4'); addPageFrame(); addHeader(pageNum); addFooter(); y = 33; doc.setFillColor(r,g,b); doc.roundedRect(10, y, 190, 8, 2, 2, 'F'); doc.setTextColor(255,255,255); doc.setFontSize(5.5); doc.text("DETALLE (cont.)", 13, y+5); y += 11 }
+      if (y > 168) { pageNum++; doc.addPage('a4'); addPageFrame(); addHeader(pageNum); addFooter(); y = 33; doc.setFillColor(r,g,b); doc.roundedRect(10, y, 190, 7, 2, 2, 'F'); doc.setTextColor(255,255,255); doc.setFontSize(5); doc.text("DETALLE (cont.)", 13, y+4.5); y += 10 }
       doc.setFillColor(255,255,255); doc.setDrawColor(235,238,242); doc.roundedRect(10, y-1, 190, 10, 2, 2, 'FD')
       if (i % 2 === 1) { doc.setFillColor(248,250,252); doc.roundedRect(10, y-1, 190, 10, 2, 2, 'F') }
-      doc.setTextColor(15,23,42); doc.setFont('helvetica','bold'); doc.setFontSize(5.5); doc.text(items[i].desc.substring(0,52), 13, y+2.8)
-      doc.setFont('helvetica','normal'); doc.setFontSize(4.4); doc.setTextColor(120,125,135); doc.text(items[i].detalle.substring(0,56), 13, y+6)
-      doc.setTextColor(30,30,35); doc.setFontSize(5.2); doc.setFont('helvetica','bold'); doc.text(items[i].cant, 90, y+4.2, {align:'center'})
+      doc.setTextColor(15,23,42); doc.setFont('helvetica','bold'); doc.setFontSize(5.2); doc.text(items[i].desc.substring(0,52), 13, y+2.8)
+      doc.setFont('helvetica','normal'); doc.setFontSize(4.2); doc.setTextColor(120,125,135); doc.text(items[i].detalle.substring(0,56), 13, y+6)
+      doc.setTextColor(30,30,35); doc.setFontSize(5); doc.setFont('helvetica','bold'); doc.text(items[i].cant, 90, y+4.2, {align:'center'})
       doc.setFont('helvetica','normal'); doc.text(`$${items[i].unit.toLocaleString('es-AR')}`, 128, y+4.2, {align:'center'})
       const sub = items[i].unit * (parseFloat(items[i].cant)||1); doc.setFont('helvetica','bold'); doc.text(`$${sub.toLocaleString('es-AR')}`, 188, y+4.2, {align:'right'}); y += 11.5
     }
@@ -188,25 +176,15 @@ export default function Home() {
               <div className="flex gap-3 items-center">{logoUrl? <div className="w-11 h-11 bg-white rounded-xl p-1.5 shadow flex items-center justify-center"><img src={logoUrl} className="w-full h-full object-contain" /></div> : <div className="w-11 h-11 bg-white/15 rounded-xl border border-white/20 grid place-items-center text-[9px] font-bold">LOGO</div>}<div><h1 className="text-[17px] font-black tracking-tight leading-none">{empresa}</h1><p className="text-[8.5px] text-white/60 mt-1 font-mono">{cuit} • {telefono}</p></div></div>
               <div className="text-right"><div className="bg-white text-[7.5px] font-black px-3 py-1 rounded-full tracking-widest shadow-sm inline-block" style={{color: final.css}}>PRESUPUESTO</div><p className="mt-1.5 text-white/70 text-[8.5px] font-mono">{nroPresu} • {hojas} hoja(s)</p></div>
             </div>
-            <div className="p-3 grid grid-cols-1 lg:grid-cols-3 gap-2.5 text-[10px] mx-[7px] mt-2.5">
-              <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
-                <p className="text-slate-400 font-bold text-[8px] uppercase tracking-widest mb-1.5">Para / Cliente:</p><div className="h-[1px] bg-slate-200 mb-2" />
-                <div className="space-y-2">
-                  <div><p className="text-[7px] text-slate-400 font-bold tracking-wider">CLIENTE</p><p className="font-black text-black text-[11px] leading-tight">{cliente}</p></div><div className="h-[1px] bg-slate-100" />
-                  <div><p className="text-[7px] text-slate-400 font-bold tracking-wider">CUIT / CONTACTO</p><p className="font-bold text-slate-800 text-[10px]">{clienteCuit} • {clienteContacto}</p></div><div className="h-[1px] bg-slate-100" />
-                  <div><p className="text-[7px] text-slate-400 font-bold tracking-wider">PROYECTO</p><p className="font-bold text-black text-[10px]">{proyecto}</p></div><div className="h-[1px] bg-slate-100" />
-                  <div><p className="text-[7px] text-slate-400 font-bold tracking-wider">DIRECCIÓN OBRA</p><p className="font-medium text-slate-700 text-[9px]">{direccion}</p></div>
-                </div>
-              </div>
-              <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-                <p className="text-slate-400 font-bold text-[8px] uppercase tracking-widest mb-1.5">Detalles presupuesto:</p><div className="h-[1px] bg-slate-200 mb-2" />
-                <div className="space-y-2 text-[9px]">
-                  <div className="flex justify-between"><span className="text-slate-400 font-bold">N°:</span><span className="font-mono font-black text-black">{nroPresu}</span></div><div className="h-[1px] bg-slate-100" />
-                  <div className="flex justify-between"><span className="text-slate-400 font-bold">Fecha:</span><span>10/09/2026</span></div><div className="h-[1px] bg-slate-100" />
-                  <div className="flex justify-between"><span className="text-slate-400 font-bold">Validez:</span><span>15 días</span></div><div className="h-[1px] bg-slate-100" />
-                  <div className="flex justify-between"><span className="text-slate-400 font-bold">Pago:</span><span>50% / 50%</span></div>
-                  <div className="mt-2.5 bg-green-50 border border-green-200 text-green-700 text-[7px] font-black px-2 py-1 rounded-full text-center">● VIGENTE - 10/09/2026</div>
-                </div>
+            {/* BLOQUE COMPACTO - AHORA EN UNA SOLA FILA */}
+            <div className="p-2 grid grid-cols-1 gap-2 text-[9px] mx-[7px] mt-2">
+              <div className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-sm flex justify-between items-center">
+                <div className="flex-1"><p className="text-[6px] text-slate-400 font-black tracking-widest">CLIENTE</p><p className="font-black text-black text-[10px] leading-none mt-1 truncate">{cliente}</p><p className="text-[7px] text-slate-500 truncate">{clienteCuit}</p></div>
+                <div className="w-[1px] h-8 bg-slate-200 mx-3" />
+                <div className="flex-1"><p className="text-[6px] text-slate-400 font-black tracking-widest">CONTACTO</p><p className="font-bold text-slate-800 text-[8px] mt-1 truncate">{clienteContacto}</p></div>
+                <div className="w-[1px] h-8 bg-slate-200 mx-3" />
+                <div className="flex-[1.5]"><p className="text-[6px] text-slate-400 font-black tracking-widest">PROYECTO / OBRA</p><p className="font-bold text-black text-[8px] mt-1 truncate">{proyecto}</p><p className="text-[7px] text-slate-500 truncate">{direccion}</p></div>
+                <div className="ml-3 text-right"><p className="text-[7px] font-mono font-black">{nroPresu}</p><div className="mt-1 bg-green-50 border border-green-200 text-green-700 text-[6px] font-black px-2 py-0.5 rounded-full">● VIGENTE</div></div>
               </div>
             </div>
             <div className="px-3 sm:px-4 mx-[7px] mt-1 flex flex-col pb-3">
