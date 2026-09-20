@@ -1,117 +1,277 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import jsPDF from "jspdf"
 
-const COLORS = ["#0A2540", "#1a1a2e", "#2a4b8d", "#c0392b", "#1e7a4c", "#000000"]
+const BASE_COLORS = ["#0A2540", "#1a1a2e", "#2a4b8d", "#c0392b", "#1e7a4c", "#000000"]
+
+type Item = { id: string, desc: string, detalle: string, cant: string, unit: number }
+type Maqueta = { id: string, nombre: string, empresa: string, brandColor: string, tinte: 'claro'|'original'|'oscuro', logoUrl: string, aliasMp: string, emailEmpresa: string, observaciones: string, titular: string, cuit: string }
 
 export default function Home() {
+  const [empresa, setEmpresa] = useState("Aberturas del Sur")
   const [brandColor, setBrandColor] = useState("#0A2540")
+  const [tinte, setTinte] = useState<'claro'|'original'|'oscuro'>('original')
   const [logoUrl, setLogoUrl] = useState("")
   const [logoName, setLogoName] = useState("")
-  const [email, setEmail] = useState("")
+  const [aliasMp, setAliasMp] = useState("aberturasdelsur.mp")
+  const [emailEmpresa, setEmailEmpresa] = useState("info@aberturasdelsur.com")
+  const [telefono, setTelefono] = useState("+54 9 221 456-7890")
+  const [titular, setTitular] = useState("Aberturas del Sur S.R.L.")
+  const [cuit, setCuit] = useState("30-71856492-1")
+  const [descuento, setDescuento] = useState(0)
+  const [nroPresu] = useState("AB-2026-0142")
   const [uploading, setUploading] = useState(false)
+  const [cliente, setCliente] = useState("Constructora Nova Urbana S.A.")
+  const [clienteCuit, setClienteCuit] = useState("30-71234567-9")
+  const [clienteContacto, setClienteContacto] = useState("Arq. Martín López - 221 555-0123")
+  const [proyecto, setProyecto] = useState("Gran Fachada Comercial de Vidrio — Centro")
+  const [direccion, setDireccion] = useState("Av. 44 Nº 1234, La Plata, Buenos Aires, Argentina")
+  const [observaciones, setObservaciones] = useState("• Material: Vidrio templado de seguridad 10mm certificado.\n• Plazo de ejecución: 20 a 25 días hábiles desde el pago del anticipo.\n• El presupuesto incluye transporte e instalación en sitio.\n• Precio en pesos argentinos, no incluye IVA.")
+  const [maquetas, setMaquetas] = useState<Maqueta[]>([])
+  const [nombreMaqueta, setNombreMaqueta] = useState("")
+  const [items, setItems] = useState<Item[]>([
+    { id: "1", desc: "Cristal templado 10mm", detalle: "Fachada comercial laminada, 40 m²", cant: "40", unit: 25000 },
+    { id: "2", desc: "Estructura de aluminio anodizado", detalle: "Perfiles línea pesada, 40 ml", cant: "40", unit: 18000 },
+    { id: "3", desc: "Instalación y mano de obra especializada", detalle: "Montaje y colocación", cant: "1", unit: 245000 },
+    { id: "4", desc: "Herrajes, sellados y silicona estructural", detalle: "Kit completo", cant: "1", unit: 85000 },
+  ])
 
+  const totalReal = items.reduce((acc, it) => acc + (it.unit * (parseFloat(it.cant) || 1)), 0)
+  const totalConDesc = totalReal - (totalReal * descuento / 100)
+  const calcHojas = () => { if (items.length <= 7) return 1; return 1 + Math.ceil((items.length - 7) / 12) }
+  const hojas = calcHojas()
+  const getFinalRgb = (hex: string) => {
+    let r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16)
+    if (tinte === 'claro') { r = Math.min(255, r+50); g = Math.min(255, g+50); b = Math.min(255, b+50) }
+    if (tinte === 'oscuro') { r = Math.max(0, r-35); g = Math.max(0, g-35); b = Math.max(0, b-35) }
+    return { r, g, b, css: `rgb(${r},${g},${b})` }
+  }
+  const final = getFinalRgb(brandColor)
+
+  useEffect(() => { const saved = localStorage.getItem("presupuestar_maquetas"); if (saved) setMaquetas(JSON.parse(saved)) }, [])
+  const guardarMaqueta = () => { if (!nombreMaqueta) return alert("Ponele un nombre"); const nueva: Maqueta = { id: Date.now().toString(), nombre: nombreMaqueta, empresa, brandColor, tinte, logoUrl, aliasMp, emailEmpresa, observaciones, titular, cuit }; const nuevas = [...maquetas, nueva]; setMaquetas(nuevas); localStorage.setItem("presupuestar_maquetas", JSON.stringify(nuevas)); setNombreMaqueta("") }
+  const cargarMaqueta = (m: Maqueta) => { setEmpresa(m.empresa); setBrandColor(m.brandColor); setTinte(m.tinte || 'original'); setLogoUrl(m.logoUrl); setAliasMp(m.aliasMp); setEmailEmpresa(m.emailEmpresa); setObservaciones(m.observaciones || observaciones); setTitular(m.titular || titular); setCuit(m.cuit || cuit) }
+  const borrarMaqueta = (id: string) => { const nuevas = maquetas.filter(m => m.id!== id); setMaquetas(nuevas); localStorage.setItem("presupuestar_maquetas", JSON.stringify(nuevas)) }
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0]; if (!file) return; setLogoName(file.name); const reader = new FileReader(); reader.onload = (ev) => setLogoUrl(ev.target?.result as string); reader.readAsDataURL(file); setUploading(true)
+    try { const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g,'_')}`; const { error } = await supabase.storage.from("logos").upload(fileName, file, { upsert: true }); if (!error) { const { data } = supabase.storage.from("logos").getPublicUrl(fileName); setLogoUrl(data.publicUrl) } } catch {} setUploading(false)
+  }
 
-    setLogoName(file.name)
-    console.log("Archivo:", file.name)
-
-    // Preview instantáneo
-    const reader = new FileReader()
-    reader.onload = (ev) => setLogoUrl(ev.target?.result as string)
-    reader.readAsDataURL(file)
-
-    setUploading(true)
-    try {
-      const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g,'_')}`
-      const { error } = await supabase.storage.from("logos").upload(fileName, file, { contentType: file.type, upsert: true })
-      if (error) throw error
-      const { data } = supabase.storage.from("logos").getPublicUrl(fileName)
-      setLogoUrl(data.publicUrl)
-    } catch (err: any) {
-      console.error(err)
-      // No borramos el preview local, así sigue funcionando
+  const downloadPDF = async () => {
+    const doc = new jsPDF({format: 'a4'}); const { r, g, b } = final
+    const addPageFrame = () => { doc.setFillColor(232,236,241); doc.rect(0, 0, 210, 297, 'F'); doc.setDrawColor(200,205,215); doc.setLineWidth(0.2); doc.rect(4.5, 4.5, 201, 288, 'D'); doc.setDrawColor(r,g,b); doc.setLineWidth(0.6); doc.rect(6, 6, 198, 285, 'D') }
+    const addHeader = (pageNum: number) => {
+      doc.setFillColor(r,g,b); doc.roundedRect(8,8,194,24,3,3,'F'); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text(empresa.substring(0,28), 16, 18)
+      doc.setFontSize(5); doc.setFont('helvetica','normal'); doc.setTextColor(200,210,225); doc.text(`${cuit} • ${telefono} • ${emailEmpresa}`, 16, 22.5)
+      // FIX LOGO - FONDO BLANCO LIMPIO Y CENTRADO
+      if (logoUrl) {
+        try {
+          doc.setFillColor(255,255,255); doc.roundedRect(85, 9.5, 18, 18, 3, 3, 'F')
+          const isPng = logoUrl.toLowerCase().includes('png') || logoUrl.startsWith('data:image/png')
+          doc.addImage(logoUrl, isPng? 'PNG' : 'JPEG', 87, 11.5, 14, 14, undefined, 'FAST')
+        } catch {}
+      }
+      doc.setFontSize(6.5); doc.setFillColor(255,255,255); doc.roundedRect(130, 10, 54, 6, 3, 3, 'F'); doc.setTextColor(r,g,b); doc.setFont('helvetica','bold'); doc.text("PRESUPUESTO / COTIZACION", 132, 13.5)
+      doc.setTextColor(255,255,255); doc.setFontSize(5); doc.setFont('helvetica','normal'); doc.text(`${nroPresu} • Hoja ${pageNum} de ${hojas}`, 132, 22)
+      doc.setFillColor(34,197,94); doc.roundedRect(178, 10, 18, 6, 2, 2, 'F'); doc.setTextColor(255,255,255); doc.setFontSize(4.5); doc.text("VIGENTE", 187, 13.5, {align:'center'})
     }
-    setUploading(false)
-  }
+    const addFooter = () => {
+      doc.setDrawColor(r,g,b); doc.setLineWidth(0.6); doc.line(14, 262, 196, 262)
+      doc.setFillColor(255,255,255); doc.setDrawColor(220,225,232); doc.roundedRect(14, 264, 182, 10, 2, 2, 'FD')
+      doc.setTextColor(80,80,80); doc.setFontSize(5.5); doc.text(`${empresa} • ${emailEmpresa} • ${telefono} • Verificar: ${nroPresu}`, 105, 270, {align:'center'})
+    }
 
-  const handleJoin = async () => {
-    if (!email) return alert("Pone tu mail")
-    const { error } = await supabase.from("waitlist").insert({ email, brand_color: brandColor, logo_url: logoUrl })
-    if (error?.code === '23505') return alert("¡Ya estabas adentro! 😉")
-    if (error) return alert(error.message)
-    alert("¡Ya estás adentro! 🔬")
-  }
-
-  const handlePDF = async () => {
-    const doc = new jsPDF()
-    doc.setFillColor(brandColor)
-    doc.rect(0, 0, 210, 35, 'F')
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(18)
-    doc.text("Aberturas del Sur", 15, 20)
-    doc.setFontSize(10)
-    doc.text("Presupuesto para Cliente Demo", 15, 27)
-    doc.setTextColor(0, 0, 0)
-    doc.setFontSize(12)
-    doc.text("Total: $1.250.000", 15, 60)
-    doc.setFillColor(brandColor)
-    doc.rect(15, 70, 180, 3, 'F')
-    doc.save(`Presupuesto-${brandColor}.pdf`)
+    let pageNum = 1; addPageFrame(); addHeader(pageNum); let y = 36
+    doc.setFillColor(255,255,255); doc.setDrawColor(220,225,232); doc.roundedRect(10, y, 116, 40, 3, 3, 'FD')
+    doc.setTextColor(140,145,155); doc.setFont('helvetica','bold'); doc.setFontSize(5.5); doc.text("PARA / CLIENTE:", 14, y+5)
+    doc.setDrawColor(235,238,242); doc.line(14, y+7, 122, y+7)
+    doc.setFont('helvetica','normal'); doc.setFontSize(5.2); doc.setTextColor(120,125,135); doc.text("CLIENTE", 14, y+10)
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.3); doc.setTextColor(15,23,42); doc.text(cliente.substring(0,44), 14, y+13)
+    doc.setDrawColor(241,245,249); doc.line(14, y+15, 122, y+15)
+    doc.setFont('helvetica','normal'); doc.setFontSize(5.2); doc.setTextColor(120,125,135); doc.text("CUIT / CONTACTO", 14, y+18)
+    doc.setFont('helvetica','bold'); doc.setFontSize(5.8); doc.setTextColor(30,41,59); doc.text(`${clienteCuit} • ${clienteContacto.substring(0,32)}`, 14, y+21)
+    doc.setDrawColor(241,245,249); doc.line(14, y+23, 122, y+23)
+    doc.setFont('helvetica','normal'); doc.setFontSize(5.2); doc.setTextColor(120,125,135); doc.text("PROYECTO", 14, y+26)
+    doc.setFont('helvetica','bold'); doc.setFontSize(5.8); doc.setTextColor(30,41,59); doc.text(proyecto.substring(0,46), 14, y+29)
+    doc.setDrawColor(241,245,249); doc.line(14, y+31, 122, y+31)
+    doc.setFont('helvetica','normal'); doc.setFontSize(5.2); doc.setTextColor(120,125,135); doc.text("DIRECCIÓN OBRA", 14, y+34)
+    doc.setFont('helvetica','bold'); doc.setFontSize(5.8); doc.setTextColor(30,41,59); doc.text(direccion.substring(0,50), 14, y+37)
+    doc.setFillColor(255,255,255); doc.roundedRect(130, y, 70, 40, 3, 3, 'FD')
+    doc.setFont('helvetica','bold'); doc.setFontSize(5.5); doc.setTextColor(140,145,155); doc.text("DETALLES PRESUPUESTO:", 134, y+5)
+    doc.setDrawColor(235,238,242); doc.line(134, y+7, 196, y+7)
+    doc.setFontSize(5.8); doc.setTextColor(30,41,59); doc.text(`N°: ${nroPresu}`, 134, y+11)
+    doc.setDrawColor(241,245,249); doc.line(134, y+13, 196, y+13)
+    doc.text(`Fecha: 10/09/2026`, 134, y+17); doc.setDrawColor(241,245,249); doc.line(134, y+19, 196, y+19)
+    doc.text(`Validez: 15 días`, 134, y+23); doc.setDrawColor(241,245,249); doc.line(134, y+25, 196, y+25)
+    doc.text(`Pago: 50% / 50%`, 134, y+29)
+    doc.setFillColor(220,252,231); doc.setDrawColor(187,247,208); doc.roundedRect(134, y+32, 62, 5, 2, 2, 'FD')
+    doc.setFontSize(5); doc.setTextColor(22,101,52); doc.text("● VIGENTE - 10/09/2026", 137, y+35.5)
+    y += 48
+    doc.setFillColor(241,245,249); doc.setDrawColor(220,225,232); doc.roundedRect(10, y, 190, 9, 2, 2, 'FD')
+    doc.setTextColor(60,70,85); doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.text("DETALLE DEL PROYECTO", 14, y+5.5)
+    doc.setFontSize(5); doc.setTextColor(100,110,125); doc.text(`${items.length} items • ${nroPresu}`, 170, y+5.5)
+    y += 12
+    doc.setFillColor(r,g,b); doc.roundedRect(10, y, 190, 9, 2, 2, 'F'); doc.setTextColor(255,255,255); doc.setFontSize(6); doc.setFont('helvetica','bold')
+    doc.text("DESCRIPCIÓN", 14, y+5.5); doc.text("CANTIDAD", 90, y+5.5, {align:'center'}); doc.text("PRECIO UNITARIO", 128, y+5.5, {align:'center'}); doc.text("SUBTOTAL", 176, y+5.5, {align:'center'}); y += 12
+    for (let i = 0; i < items.length; i++) {
+      if (y > 192) { pageNum++; doc.addPage('a4'); addPageFrame(); addHeader(pageNum); addFooter(); y = 36; doc.setFillColor(r,g,b); doc.roundedRect(10, y, 190, 9, 2, 2, 'F'); doc.setTextColor(255,255,255); doc.setFontSize(6); doc.text("DETALLE (cont.)", 14, y+5.5); y += 14 }
+      doc.setFillColor(255,255,255); doc.setDrawColor(235,238,242); doc.roundedRect(10, y-1, 190, 13, 2, 2, 'FD')
+      if (i % 2 === 1) { doc.setFillColor(248,250,252); doc.roundedRect(10, y-1, 190, 13, 2, 2, 'F') }
+      doc.setTextColor(15,23,42); doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.text(items[i].desc.substring(0,50), 14, y+3)
+      doc.setFont('helvetica','normal'); doc.setFontSize(5); doc.setTextColor(120,125,135); doc.text(items[i].detalle.substring(0,54), 14, y+7.5)
+      doc.setTextColor(30,30,35); doc.setFontSize(6); doc.setFont('helvetica','bold'); doc.text(items[i].cant, 90, y+5, {align:'center'})
+      doc.setFont('helvetica','normal'); doc.text(`$${items[i].unit.toLocaleString('es-AR')}`, 128, y+5, {align:'center'})
+      const sub = items[i].unit * (parseFloat(items[i].cant)||1); doc.setFont('helvetica','bold'); doc.text(`$${sub.toLocaleString('es-AR')}`, 188, y+5, {align:'right'}); y += 15
+    }
+    if (y + 80 > 262) { pageNum++; doc.addPage('a4'); addPageFrame(); addHeader(pageNum); addFooter(); y = 40 }
+    y += 4; doc.setFillColor(255,255,255); doc.setDrawColor(220,225,232); doc.roundedRect(120, y, 80, 26, 3, 3, 'FD')
+    doc.setTextColor(100,110,125); doc.setFontSize(5.5); doc.setFont('helvetica','normal')
+    doc.text("Subtotal:", 124, y+6); doc.text(`$${totalReal.toLocaleString('es-AR')}`, 196, y+6, {align:'right'})
+    if(descuento > 0){ doc.text(`Descuento ${descuento}%:`, 124, y+11); doc.text(`-$${(totalReal*descuento/100).toLocaleString('es-AR')}`, 196, y+11, {align:'right'}) }
+    doc.text("IVA (0%):", 124, y+16); doc.text("$0", 196, y+16, {align:'right'})
+    y += 20; doc.setFillColor(r,g,b); doc.roundedRect(120, y, 80, 11, 3, 3, 'F'); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.text(`TOTAL: $${totalConDesc.toLocaleString('es-AR')}`, 124, y+7)
+    y += 18; doc.setFillColor(255,255,255); doc.setDrawColor(220,225,232); doc.roundedRect(10, y, 88, 32, 3, 3, 'FD')
+    doc.setTextColor(15,23,42); doc.setFontSize(5.5); doc.setFont('helvetica','bold'); doc.text("ⓘ Observaciones y Condiciones:", 14, y+6)
+    doc.setDrawColor(235,238,242); doc.line(14, y+8.5, 92, y+8.5); doc.setFontSize(5); doc.setFont('helvetica','normal'); doc.setTextColor(70,75,85)
+    const obsLines = doc.splitTextToSize(observaciones, 80); doc.text(obsLines.slice(0,6), 14, y+12)
+    doc.setFillColor(255,255,255); doc.setDrawColor(200,210,235); doc.roundedRect(106, y, 94, 32, 3, 3, 'FD')
+    doc.setTextColor(r,g,b); doc.setFont('helvetica','bold'); doc.setFontSize(5.5); doc.text("DATOS DE PAGO • VERIFICACIÓN", 110, y+6)
+    doc.setDrawColor(230,235,242); doc.line(110, y+8.5, 196, y+8.5); doc.setTextColor(20,25,35); doc.setFontSize(5.5); doc.text(`ALIAS: ${aliasMp}`, 110, y+12)
+    doc.setFontSize(4.8); doc.setTextColor(90,95,105); doc.text(`Titular: ${titular}`, 110, y+17); doc.text(`CUIT: ${cuit}`, 110, y+21); doc.text(`Cod: ${nroPresu}`, 110, y+25)
+    doc.setFillColor(248,250,252); doc.setDrawColor(220,225,232); doc.roundedRect(170, y+10, 24, 18, 2, 2, 'FD'); doc.setTextColor(80,85,95); doc.setFontSize(4.2); doc.setFont('helvetica','bold'); doc.text("QR VERIFICAR", 182, y+17, {align:'center'}); doc.setFontSize(3.8); doc.text(nroPresu, 182, y+21, {align:'center'})
+    y += 38; doc.setDrawColor(180,185,195); doc.setLineWidth(0.3); doc.line(14, y, 90, y); doc.setTextColor(60,65,75); doc.setFontSize(5); doc.text("Firma y aclaración - Aberturas del Sur", 14, y+4); doc.setTextColor(140,145,155); doc.setFontSize(4.5); doc.text(`${titular} • ${cuit}`, 14, y+8)
+    doc.setDrawColor(180,185,195); doc.line(110, y, 196, y); doc.setTextColor(60,65,75); doc.setFontSize(5); doc.text("Firma y aclaración - Cliente (Aceptación)", 110, y+4); doc.setTextColor(140,145,155); doc.setFontSize(4.5); doc.text("Acepto condiciones y precios detallados", 110, y+8)
+    addFooter(); doc.save(`Presupuesto-${nroPresu}-${empresa}.pdf`)
   }
 
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col items-center p-6">
-      <p className="text-zinc-400 text-sm mt-10 mb-8">Unite al drop exclusivo.</p>
-
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 w-full max-w-sm mb-6">
-        <p className="text-[10px] tracking-widest text-zinc-500 mb-3">TEST COLOR MARCA (WHITE-LABEL):</p>
-        <div className="flex gap-2 mb-4">
-          {COLORS.map(c => (
-            <button key={c} onClick={() => setBrandColor(c)} className={`w-8 h-8 rounded-full border-2 ${brandColor === c? 'border-white' : 'border-zinc-700'}`} style={{ backgroundColor: c }} />
-          ))}
+    <main className="min-h-screen flex flex-col lg:flex-row bg-[#b8c0cc]">
+      <div className="w-full lg:w-[420px] bg-[#1E293B] p-4 sm:p-6 space-y-5 lg:h-screen lg:overflow-y-auto lg:sticky lg:top-0 text-white order-2 lg:order-1">
+        <h2 className="font-black text-[12px] tracking-widest">1. TU MARCA + COLOR</h2>
+        <div className="space-y-3">
+          <input value={empresa} onChange={e=>setEmpresa(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-white" placeholder="Nombre empresa"/>
+          <div className="grid grid-cols-2 gap-2">
+            <input value={cuit} onChange={e=>setCuit(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-[12px] text-white outline-none" placeholder="CUIT"/>
+            <input value={telefono} onChange={e=>setTelefono(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-[12px] text-white outline-none" placeholder="Teléfono"/>
+          </div>
+          <p className="text-[10px] font-bold text-yellow-400">PALETA ORIGINAL + CUSTOM</p>
+          <div className="flex gap-2.5 p-3 bg-slate-800 rounded-xl border border-slate-600">
+            {BASE_COLORS.map(c => <button key={c} onClick={()=>setBrandColor(c)} className={`w-9 h-9 rounded-full border-2 ${brandColor===c?'border-white scale-110':'border-transparent'}`} style={{backgroundColor:c}} />)}
+            <label className="w-9 h-9 rounded-full border-2 border-dashed border-slate-400 grid place-items-center cursor-pointer bg-slate-700 text-[11px] font-bold">+<input type="color" value={brandColor} onChange={e=>setBrandColor(e.target.value)} className="hidden" /></label>
+          </div>
+          <div className="flex gap-2">
+            {(['claro','original','oscuro'] as const).map(t => (
+              <button key={t} onClick={()=>setTinte(t)} className={`flex-1 py-2.5 rounded-xl text-[10px] font-black border ${tinte===t?'bg-white text-black border-white':'bg-slate-800 text-slate-300 border-slate-600'}`}>{t.toUpperCase()}</button>
+            ))}
+          </div>
+          <div className="h-4 rounded-full border border-slate-600" style={{backgroundColor: final.css}} />
+          <input type="file" id="logo-upload" hidden accept="image/*" onChange={handleLogoUpload} />
+          <label htmlFor="logo-upload" className="block w-full border border-dashed border-slate-500 rounded-xl p-3 text-center text-[12px] cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-300">{uploading? "Subiendo..." : logoName? `✅ ${logoName}` : "📁 Subir logo"}</label>
+          {logoUrl && <div className="flex justify-center"><div className="w-20 h-20 bg-white rounded-xl p-2 shadow"><img src={logoUrl} className="w-full h-full object-contain" /></div></div>}
+          <input value={aliasMp} onChange={e=>setAliasMp(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white outline-none" placeholder="alias.mp"/>
+          <input value={emailEmpresa} onChange={e=>setEmailEmpresa(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white outline-none" placeholder="email"/>
+          <input value={titular} onChange={e=>setTitular(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-[12px] text-white outline-none" placeholder="Titular"/>
         </div>
-        <input value={brandColor} onChange={e => setBrandColor(e.target.value)} className="w-full border border-zinc-800 rounded-md px-3 py-2 text-sm outline-none mb-4" style={{ backgroundColor: brandColor }} />
-
-        <p className="text-[10px] text-zinc-500 mb-2">Logo de la empresa:</p>
-        {/* FIX: Un solo input y un solo label */}
-        <input
-          type="file"
-          id="logo-upload"
-          hidden
-          accept="image/png, image/jpeg, image/webp, image/svg+xml"
-          onChange={handleLogoUpload}
-        />
-        <div className="flex items-center gap-3">
-          <label htmlFor="logo-upload" className="bg-white text-black text-xs px-4 py-2 rounded cursor-pointer font-bold hover:bg-zinc-200 transition">
-            {uploading? "Subiendo..." : logoUrl? "✓ Cambiar Logo" : "Seleccionar archivo"}
-          </label>
-          <span className="text-[10px] text-zinc-400 truncate max-w-[150px]">
-            {uploading? "subiendo..." : logoName? logoName : "sin archivo"}
-          </span>
+        <h2 className="font-black text-[12px] pt-4 border-t border-slate-700">2. CONDICIONES</h2>
+        <div className="grid grid-cols-2 gap-2">
+          <div><p className="text-[10px] text-slate-400 mb-1">Descuento %</p><input type="number" value={descuento} onChange={e=>setDescuento(Number(e.target.value))} className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white outline-none"/></div>
+          <div><p className="text-[10px] text-slate-400 mb-1">Código</p><input value={nroPresu} readOnly className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-[12px] text-yellow-400 font-bold"/></div>
         </div>
-        {logoUrl && <p className="text-[9px] text-green-400 mt-2">✓ {logoName} cargado correctamente</p>}
-      </div>
-
-      <div className="flex gap-2 mb-8">
-        <input value={email} onChange={e => setEmail(e.target.value)} placeholder="tu email" className="bg-zinc-900 border border-zinc-800 px-4 py-2 rounded text-sm outline-none w-48" />
-        <button onClick={handleJoin} className="bg-white text-black px-5 py-2 rounded text-sm font-bold">JOIN</button>
-      </div>
-
-      <div className="w-full max-w-lg bg-white rounded-lg overflow-hidden text-black mb-6">
-        <div className="p-5 flex justify-between items-center text-white" style={{ backgroundColor: brandColor }}>
-          <div><h2 className="font-bold text-lg">Aberturas del Sur</h2><p className="text-[11px] opacity-80">Presupuesto para Cliente Demo</p></div>
-          {logoUrl? <img src={logoUrl} alt="logo" className="w-12 h-12 bg-white rounded object-contain p-1" /> : <div className="w-10 h-10 bg-white/20 rounded" />}
+        <textarea value={observaciones} onChange={e=>setObservaciones(e.target.value)} rows={5} className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-3 text-[12px] text-white outline-none leading-relaxed" />
+        <div className="bg-slate-800 rounded-xl p-4 border border-slate-600 space-y-3">
+          <h3 className="font-black text-[11px] text-yellow-400">💾 MAQUETA</h3>
+          <input value={nombreMaqueta} onChange={e=>setNombreMaqueta(e.target.value)} placeholder="Ej: Azul Original" className="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 text-[12px] text-white outline-none"/>
+          <button onClick={guardarMaqueta} className="w-full bg-white text-slate-900 rounded-xl py-2.5 text-[12px] font-black">Guardar plantilla</button>
+          <div className="space-y-2 max-h-32 overflow-y-auto">{maquetas.map(m => (<div key={m.id} className="flex items-center justify-between bg-slate-900 p-2 rounded-xl border border-slate-700"><div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full" style={{backgroundColor:m.brandColor}}/><p className="text-[11px] font-bold truncate">{m.nombre}</p></div><div className="flex gap-1"><button onClick={()=>cargarMaqueta(m)} className="bg-slate-700 px-2 py-1 rounded-lg text-[10px]">Cargar</button><button onClick={()=>borrarMaqueta(m.id)} className="text-red-400 px-1">x</button></div></div>))}</div>
         </div>
-        <div className="p-6"><div className="flex justify-between"><span className="text-xs text-zinc-600">Total</span><span className="font-bold">$1.250.000</span></div><div className="h-2 rounded-full mt-6" style={{ backgroundColor: brandColor }} /></div>
+        <h2 className="font-black text-[12px] pt-4 border-t border-slate-700">3. CLIENTE - PRO</h2>
+        <div className="space-y-3">
+          <input value={cliente} onChange={e=>setCliente(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white outline-none" placeholder="Cliente"/>
+          <div className="grid grid-cols-2 gap-2">
+            <input value={clienteCuit} onChange={e=>setClienteCuit(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-[12px] text-white outline-none" placeholder="CUIT Cliente"/>
+            <input value={clienteContacto} onChange={e=>setClienteContacto(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-[12px] text-white outline-none" placeholder="Contacto / Tel"/>
+          </div>
+          <input value={proyecto} onChange={e=>setProyecto(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white outline-none" placeholder="Proyecto"/>
+          <input value={direccion} onChange={e=>setDireccion(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white outline-none" placeholder="Dirección obra"/>
+        </div>
+        <h2 className="font-black text-[12px] pt-4 border-t border-slate-700">4. ITEMS ({items.length}) - {hojas} hoja(s)</h2>
+        <div className="space-y-2 max-h-80 overflow-y-auto pr-1">{items.map((it, idx) => (<div key={it.id} className="border border-slate-600 rounded-xl p-3 bg-slate-800"><input value={it.desc} onChange={e=>{ const n=[...items]; n[idx].desc=e.target.value; setItems(n)}} className="w-full font-bold text-[12px] bg-transparent outline-none text-white"/><input value={it.detalle} onChange={e=>{ const n=[...items]; n[idx].detalle=e.target.value; setItems(n)}} className="w-full text-[11px] bg-transparent outline-none text-slate-400 mt-1"/><div className="flex gap-2 mt-3"><input value={it.cant} onChange={e=>{ const n=[...items]; n[idx].cant=e.target.value; setItems(n)}} className="w-16 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-[11px] text-white"/><input type="number" value={it.unit} onChange={e=>{ const n=[...items]; n[idx].unit=Number(e.target.value); setItems(n)}} className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-[11px] text-white"/><button onClick={()=>setItems(items.filter(x=>x.id!==it.id))} className="text-red-400 px-2">x</button></div></div>))}<button onClick={()=>setItems([...items, {id: Date.now().toString(), desc:"Nuevo item", detalle:"Detalle", cant:"1", unit:0}])} className="w-full bg-white text-slate-900 rounded-full py-3 text-[12px] font-bold">+ Agregar Item</button></div>
+        <button onClick={downloadPDF} className="w-full bg-yellow-400 text-black rounded-xl py-4 font-black text-[15px] hover:bg-yellow-300 shadow-lg sticky bottom-0 flex flex-col items-center leading-none">
+          <span>📄 DESCARGAR PDF PRO</span>
+          <span className="text-[11px] font-black mt-1.5 bg-black text-yellow-400 px-4 py-1 rounded-full tracking-wider">{nroPresu} • {hojas} {hojas === 1? 'HOJA' : 'HOJAS'} • ${totalConDesc.toLocaleString('es-AR')}</span>
+        </button>
       </div>
-
-      <button onClick={handlePDF} className="bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-zinc-200 transition">
-        Descargar Presupuesto PDF 📄
-      </button>
+      <div className="flex-1 p-2 sm:p-6 lg:p-10 overflow-auto order-1 lg:order-2 bg-[#9aa6b8]">
+        <div className="w-full max-w-[850px] mx-auto bg-[#e8ecf1] shadow-[0_25px_80px_rgba(0,0,0,0.22)] relative overflow-hidden rounded-[12px] border-[1.5px] border-slate-400">
+          <div className="absolute inset-[7px] border border-slate-300/80 pointer-events-none rounded-[10px]" />
+          <div className="absolute inset-[10px] border pointer-events-none rounded-[8px] opacity-30" style={{borderColor: final.css}} />
+          <div className="relative z-10">
+            <div className="p-4 sm:p-5 flex justify-between items-center gap-3 text-white m-[7px] mb-0 rounded-t-[10px]" style={{backgroundColor: final.css}}>
+              <div className="flex gap-3 items-center">
+                {logoUrl? <div className="w-12 h-12 bg-white rounded-xl p-1.5 shadow flex items-center justify-center"><img src={logoUrl} className="w-full h-full object-contain" /></div> : <div className="w-12 h-12 bg-white/15 rounded-xl border border-white/20 grid place-items-center text-[9px] font-bold">LOGO</div>}
+                <div><h1 className="text-[18px] sm:text-[20px] font-black tracking-tight leading-none">{empresa}</h1><p className="text-[9px] text-white/60 mt-1 font-mono">{cuit} • {telefono}</p></div>
+              </div>
+              <div className="text-right"><div className="bg-white text-[8px] font-black px-3 py-1 rounded-full tracking-widest shadow-sm inline-block" style={{color: final.css}}>PRESUPUESTO</div><p className="mt-1.5 text-white/70 text-[9px] font-mono">{nroPresu} • {hojas} hoja(s)</p></div>
+            </div>
+            <div className="p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-3 gap-3 text-[11px] mx-[7px] mt-3">
+              <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                <p className="text-slate-400 font-bold text-[9px] uppercase tracking-widest mb-2">Para / Cliente:</p>
+                <div className="h-[1px] bg-slate-200 mb-3" />
+                <div className="space-y-3">
+                  <div><p className="text-[8px] text-slate-400 font-bold tracking-wider">CLIENTE</p><p className="font-black text-black text-[12px] leading-tight">{cliente}</p></div>
+                  <div className="h-[1px] bg-slate-100" />
+                  <div><p className="text-[8px] text-slate-400 font-bold tracking-wider">CUIT / CONTACTO</p><p className="font-bold text-slate-800 text-[11px]">{clienteCuit} • {clienteContacto}</p></div>
+                  <div className="h-[1px] bg-slate-100" />
+                  <div><p className="text-[8px] text-slate-400 font-bold tracking-wider">PROYECTO</p><p className="font-bold text-black text-[11px]">{proyecto}</p></div>
+                  <div className="h-[1px] bg-slate-100" />
+                  <div><p className="text-[8px] text-slate-400 font-bold tracking-wider">DIRECCIÓN OBRA</p><p className="font-medium text-slate-700 text-[10px]">{direccion}</p></div>
+                </div>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+                <p className="text-slate-400 font-bold text-[9px] uppercase tracking-widest mb-2">Detalles presupuesto:</p>
+                <div className="h-[1px] bg-slate-200 mb-3" />
+                <div className="space-y-2.5 text-[10px]">
+                  <div className="flex justify-between"><span className="text-slate-400 font-bold">N°:</span><span className="font-mono font-black text-black">{nroPresu}</span></div>
+                  <div className="h-[1px] bg-slate-100" />
+                  <div className="flex justify-between"><span className="text-slate-400 font-bold">Fecha:</span><span>10/09/2026</span></div>
+                  <div className="h-[1px] bg-slate-100" />
+                  <div className="flex justify-between"><span className="text-slate-400 font-bold">Validez:</span><span>15 días</span></div>
+                  <div className="h-[1px] bg-slate-100" />
+                  <div className="flex justify-between"><span className="text-slate-400 font-bold">Pago:</span><span>50% / 50%</span></div>
+                  <div className="mt-3 bg-green-50 border border-green-200 text-green-700 text-[8px] font-black px-2 py-1.5 rounded-full text-center">● VIGENTE - 10/09/2026</div>
+                </div>
+              </div>
+            </div>
+            <div className="px-3 sm:px-4 pb-4 mx-[7px] mt-1">
+              <div className="flex items-center gap-3 px-4 py-2.5 rounded-t-xl border border-slate-200 border-b-0 bg-[#f1f5f9] shadow-sm">
+                <span className="font-black text-[10px] tracking-widest text-slate-700">DETALLE DEL PROYECTO</span>
+                <span className="ml-auto text-[8px] text-slate-500 bg-white px-2 py-1 rounded-full border border-slate-200">{nroPresu} • {items.length} items • {hojas} hoja(s)</span>
+              </div>
+              <div className="border border-slate-200 rounded-b-xl overflow-hidden shadow-sm overflow-x-auto bg-white">
+                <div className="min-w-[600px]">
+                  <div className="grid grid-cols-[1.5fr_0.4fr_0.6fr_0.6fr] text-white text-[9px] font-black p-3 tracking-wider" style={{backgroundColor: final.css}}><span>DESCRIPCIÓN</span><span className="text-center">CANTIDAD</span><span className="text-center">PRECIO UNITARIO</span><span className="text-right">SUBTOTAL</span></div>
+                  {items.map((it, i) => (<div key={it.id} className={`grid grid-cols-[1.5fr_0.4fr_0.6fr_0.6fr] px-4 py-3.5 text-[11px] border-b border-slate-100 items-center ${i%2===0? 'bg-white' : 'bg-[#f8f9fb]'}`}><div className="pr-3"><p className="font-bold text-black leading-tight">{it.desc}</p><p className="text-[9px] text-slate-500 mt-1">{it.detalle}</p></div><span className="text-center font-bold text-black">{it.cant}</span><span className="text-center font-medium text-slate-700 text-[10px]">${it.unit.toLocaleString('es-AR')}</span><span className="text-right font-black text-black">${(it.unit * (parseFloat(it.cant)||1)).toLocaleString('es-AR')}</span></div>))}
+                </div>
+              </div>
+              <div className="flex justify-end mt-4">
+                <div className="w-full sm:w-[340px] bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                  <div className="flex justify-between text-[11px] text-slate-600 px-2"><span>Subtotal:</span><span className="font-bold text-black">${totalReal.toLocaleString('es-AR')}</span></div>
+                  {descuento > 0 && <div className="flex justify-between text-[11px] text-green-600 px-2"><span>Descuento {descuento}%:</span><span className="font-bold">-${(totalReal*descuento/100).toLocaleString('es-AR')}</span></div>}
+                  <div className="h-[1px] bg-slate-200" /><div className="flex justify-between text-[11px] text-slate-600 px-2"><span>IVA:</span><span>$0</span></div>
+                  <div className="flex justify-between items-center text-white px-5 py-3 rounded-xl font-black text-[14px] shadow-md mt-2" style={{backgroundColor: final.css}}><span>TOTAL:</span><span>${totalConDesc.toLocaleString('es-AR')}</span></div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-5">
+                <div className="border border-slate-200 rounded-xl p-4 text-[10px] bg-white shadow-sm"><p className="font-black text-slate-900 text-[10px]">ⓘ Observaciones y Condiciones:</p><div className="h-[1px] bg-slate-200 my-2" /><p className="whitespace-pre-wrap text-slate-700 leading-relaxed">{observaciones}</p></div>
+                <div className="rounded-xl p-4 flex gap-3 border-2 shadow-sm bg-white" style={{borderColor: `${final.css}30`}}><div className="flex-1 text-[10px] text-slate-700"><p className="font-black text-[11px]" style={{color: final.css}}>DATOS DE PAGO • VERIFICACIÓN</p><div className="h-[1px] bg-slate-200 my-2" /><p><span className="font-bold text-[9px] text-slate-500">ALIAS:</span><br/><span className="font-black text-[12px] text-black">{aliasMp}</span></p><p className="mt-2 text-[9px] leading-relaxed">{titular}<br/>{cuit}<br/>Cod: {nroPresu}</p></div><div className="text-center"><div className="w-20 h-20 bg-slate-50 p-1.5 rounded-xl border border-slate-200 grid place-items-center text-[7px] text-black font-bold">QR<br/>{nroPresu}</div><p className="text-[7px] mt-1 text-slate-500">Verificar</p></div></div>
+              </div>
+              <div className="grid grid-cols-2 gap-10 mt-8 pt-4 border-t border-slate-200"><div><div className="h-[1px] bg-slate-800 w-full mb-2"/><p className="text-[9px] font-bold text-slate-800">Firma y aclaración - {empresa}</p><p className="text-[8px] text-slate-500">{titular}</p></div><div><div className="h-[1px] bg-slate-800 w-full mb-2"/><p className="text-[9px] font-bold text-slate-800">Firma cliente - Aceptación</p><p className="text-[8px] text-slate-500">Acepto condiciones y precios</p></div></div>
+            </div>
+            <div className="mx-[7px] mb-[7px] border-t-2 pt-3 pb-4 bg-white rounded-b-[10px] flex flex-col items-center" style={{borderColor: final.css}}><p className="text-center text-[9px] text-slate-700 font-bold">{empresa} • {emailEmpresa} • {telefono} • Verificar: {nroPresu}</p><p className="text-center text-[7px] text-slate-400 mt-1">Generado con PresupuestAR • {hojas} hoja(s) • 10/09/2026</p></div>
+          </div>
+        </div>
+      </div>
     </main>
   )
 }
